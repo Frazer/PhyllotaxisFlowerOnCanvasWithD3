@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+  .controls{
+    float:right;
+    border: 1px solid black;
+    margin: 10px;
+    padding: 10px;
+    width: 20vw;
+    text-align: center;
+  }
+  * { margin:0; padding:0; } /* to remove the top and left whitespace */
+
+  html, body { width:100%; height:100%; } /* just to be sure these are full screen*/
+
+  canvas { display:block; } /* To remove the scrollbars */
+</style>
+<div id="controls" class="controls">
+    Spin Speed<br/>
+    <input type="range" min="-4" max="20" value="1000" class="slider" id="speedRange"><br/>
+    Number of Dots: <span id="numberOfDots"></span><br/>
+    <input type="range" min="200" max="6000" value="200" class="slider" id="dotsRange"><br/>
+    <hr/>
+    <span onClick="toggleColors()">Colors <input type="checkbox" name="" id="c">   <br/></span>
+    <span id="colorControls">
+
+      Speed of color zoom<br/>
+      <input type="range" min="-30" max="30" value="5" class="slider" id="colorSpeed"><br/>
+      Rainbow wavelength<br/>
+      <input type="range" min="1" max="1000" value="108" class="slider" id="rainbowRange"><br/>
+
+    </span>
+  
+</div>
+<canvas></canvas>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://d3js.org/d3-hsv.v0.1.min.js"></script>
+
+<script>
+var canvas = d3.select("canvas"),
+    context = canvas.node().getContext("2d"),
+    canvasSize;
+ 
+var settings = {
+  numberOfDots: 2000,
+  spinSpeed: 4,
+  colorSpeed: 5,
+  rainbowWavelength: 108,
+};
+
+(function() {
+    
+    // resize the canvas to fill browser window dynamically
+    window.addEventListener('resize', resizeCanvas, false);
+
+    function resizeCanvas() {
+      var controls=document.getElementById('controls');
+        
+      if(window.innerWidth-controls.offsetWidth > window.innerHeight){
+        canvasSize = window.innerHeight; 
+      }else{
+        canvasSize = window.innerWidth-controls.offsetWidth-22;
+      }
+      //console.log(canvasSize);
+      //299/455  => 90000  = n*200
+      //453/1024 => 200000 = n*200
+      //677/2000 => 400000 = n*200
+      
+      width = height = canvasSize;
+      canvas.node().width = canvasSize;
+      canvas.node().height = canvasSize;
+    }
+    resizeCanvas();
+
+})()
+
+let colorsOn = true;
+document.getElementById('c').checked = colorsOn;
+
+function toggleColors(){
+        colorsOn = !colorsOn;
+        var off=document.getElementById('colorControls');
+        document.getElementById('c').checked = colorsOn;
+        
+        if (off.style.display == "none") {
+            off.style.display = "block";
+        } else {
+            off.style.display = "none";
+        }        
+}
+
+/**
+ * initializeSliders
+ */
+function initializeSlider(rangeId, outputId, settings, variableName){
+  var thisSlider = document.getElementById(rangeId);
+  var thisOutput = document.getElementById(outputId);
+  if(thisOutput){
+    thisOutput.innerHTML = settings[variableName];
+  }
+  thisSlider.value = settings[variableName];
+
+  // Update the current slider value (each time you drag the slider handle)
+  thisSlider.oninput = function() {
+    settings[variableName] = this.value;
+    if(thisOutput){
+      thisOutput.innerHTML = this.value;
+    }
+  } 
+
+}
+
+initializeSlider("dotsRange","numberOfDots",settings,"numberOfDots");
+initializeSlider("speedRange",undefined,settings,"spinSpeed");
+initializeSlider("colorSpeed",undefined,settings,"colorSpeed");
+initializeSlider("rainbowRange",undefined,settings,"rainbowWavelength");
+
+
+
+var width = canvas.property("width"),
+    height = canvas.property("height"),
+    radius = 2.5,
+    transform = d3.zoomIdentity,
+    colorTracker =0;
+
+
+var points = d3.range(settings.numberOfDots).map(phyllotaxis(10));
+
+var zoom = d3.zoom().scaleExtent([1 / 2, 8]).on("zoom", zoomed);
+canvas
+    .call(d3.drag().subject(dragsubject).on("drag", dragged))
+    .call(zoom)
+    .call(render);
+
+
+zoom.scaleBy(canvas, canvasSize/Math.sqrt(settings.numberOfDots*200));
+
+function zoomed() {
+  transform = d3.event.transform;
+  render();
+}
+function dragsubject() {
+  var i,
+      x = transform.invertX(d3.event.x),
+      y = transform.invertY(d3.event.y),
+      dx,
+      dy;
+  for (i = points.length - 1; i >= 0; --i) {
+    point = points[i];
+    dx = x - point[0];
+    dy = y - point[1];
+    if (dx * dx + dy * dy < radius * radius) {
+      point.x = transform.applyX(point[0]);
+      point.y = transform.applyY(point[1]);
+      return point;
+    }
+  }
+}
+function dragged() {
+  d3.event.subject[0] = transform.invertX(d3.event.x);
+  d3.event.subject[1] = transform.invertY(d3.event.y);
+  render();
+}
+var colorStart = 0;
+function render() {
+  colorTracker = colorStart;
+  colorStart-=settings.colorSpeed; 
+  context.save();
+  context.clearRect(0, 0, width, height);
+  context.translate(transform.x, transform.y);
+  context.scale(transform.k, transform.k);
+  points.forEach(drawPoint);
+  // context.fill();
+  context.restore();
+}
+
+function changeColor(){
+  if(!colorsOn){
+    return '#000';
+  }else{
+      colorTracker += settings.rainbowWavelength/200;
+    return d3.hsv(colorTracker,1,1) 
+  }
+}
+function drawPoint(point) {
+  context.beginPath();
+  context.moveTo(point[0] + radius, point[1]);
+  context.fillStyle = changeColor();
+  context.arc(point[0], point[1], radius, 0, 2 * Math.PI);
+  context.fill();
+}
+function phyllotaxis(radius, factor) {
+  var theta = Math.PI * (3 - Math.sqrt(5))+factor;
+  return function(i) {
+    var r = radius * Math.sqrt(i), a = theta * i;
+    return [
+      width / 2 + r * Math.cos(a),
+      height / 2 + r * Math.sin(a)
+    ];
+  };
+}
+var rotateFactor = 0;
+var rr = function(){
+  points = d3.range(settings.numberOfDots).map(phyllotaxis(7,rotateFactor));
+  render();
+  rotateFactor += Math.sign(settings.spinSpeed)*settings.spinSpeed*settings.spinSpeed/1000000;
+  requestAnimationFrame(rr);
+}
+requestAnimationFrame(rr);
+</script>
