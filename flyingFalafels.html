@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Flying falafel demo</title>
+    <meta charset="utf-8">
+    <style>
+      .controls{
+        position: fixed;
+        top: 5px;
+        right: 5px;
+        border: 1px solid black;
+        
+        padding: 10px;
+        width: 15vw;
+        text-align: center;
+        background-color: white;
+      }
+      * { margin:0; padding:0; } /* to remove the top and left whitespace */
+
+      html, body { width:100%; height:100%; } /* just to be sure these are full screen*/
+
+      canvas { display:block; } /* To remove the scrollbars */
+
+
+      /*Image by Republica on Pixabay*/
+    </style>
+  </head>
+  <body>
+    
+    <div id="controls" class="controls">
+        Spin Speed<br/>
+        <input type="range" min="-4" max="20" value="1000" class="slider" id="speedRange"><br/>
+        Number of Dots<br/>
+        <input type="range" min="6" max="75" value="20" class="slider" id="dotsRange"><br/>
+        Spread<br/>
+        <input type="range" min="7" max="20" value="7" class="slider" id="radiusRange"><br/>
+        You can zoome and pan<br/>with your mouse<br/><br/>
+        <hr/>
+        <span onClick="toggleColors()">Colors <input type="checkbox" name="" id="c">   <br/></span>
+        <span id="colorControls">
+  
+          Speed of color zoom<br/>
+          <input type="range" min="-30" max="30" value="5" class="slider" id="colorSpeed"><br/>
+          Rainbow wavelength<br/>
+          <input type="range" min="1" max="1000" value="108" class="slider" id="rainbowRange"><br/>
+  
+        </span>
+      
+    </div>
+    <canvas></canvas>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://d3js.org/d3-hsv.v0.1.min.js"></script>
+  
+    <script>
+let logoLoaded = false;
+let logoImageReceived = ()=>{logoLoaded = true};
+let logoImage = new Image;
+
+let falafelLoaded = false;
+let falafelImageReceived = ()=>{falafelLoaded = true};
+let falafelImage = new Image;
+
+function startDownload() {
+  let imageURL = "https://static.wixstatic.com/media/f37d82_6b811671500245a3910c892aaeeb3934~mv2_d_2660_1860_s_2.png/v1/fill/w_148,h_104,al_c,q_80,usm_0.66_1.00_0.01/f37d82_6b811671500245a3910c892aaeeb3934~mv2_d_2660_1860_s_2.webp";
+ 
+  logoImage.crossOrigin = "Anonymous";
+  logoImage.addEventListener("load", logoImageReceived, false);
+  logoImage.src = imageURL;
+
+  let falafelImageURL = "falafel.png";
+ 
+  falafelImage.crossOrigin = "Anonymous";
+  falafelImage.addEventListener("load", falafelImageReceived, false);
+  falafelImage.src = falafelImageURL;
+}
+startDownload();
+
+
+    var canvas = d3.select("canvas"),
+        context = canvas.node().getContext("2d"),
+        canvasSize;
+    
+    var settings = {
+      numberOfDots: 6,
+      spinSpeed: 4,
+      colorSpeed: 5,
+      rainbowWavelength: 800,
+      radius: 7,
+      colorsOn: true,
+    };
+  
+    (function() {
+        
+        // resize the canvas to fill browser window dynamically
+        window.addEventListener('resize', resizeCanvas, false);
+  
+        function resizeCanvas() {
+          var controls=document.getElementById('controls');
+            
+          if(window.innerWidth > window.innerHeight){
+            canvasSize = window.innerHeight; 
+          }else{
+            canvasSize = window.innerWidth;
+          }
+          //console.log(canvasSize);
+          //299/455  => 90000  = n*200
+          //453/1024 => 200000 = n*200
+          //677/2000 => 400000 = n*200
+          
+          width = canvas.node().width = window.innerWidth;
+          height = canvas.node().height = window.innerHeight;
+        }
+        resizeCanvas();
+  
+    })()
+  
+    document.getElementById('c').checked = settings.colorsOn;
+  
+    function toggleColors(){
+            settings.colorsOn = !settings.colorsOn;
+            var off=document.getElementById('colorControls');
+            document.getElementById('c').checked = settings.colorsOn;
+            
+            if (off.style.display == "none") {
+                off.style.display = "block";
+            } else {
+                off.style.display = "none";
+            }        
+    }
+    toggleColors();  // turns off colors and turns on falafels
+
+    
+    /**
+     * initializeSliders
+     */
+    function initializeSlider(rangeId, outputId, settings, variableName){
+      var thisSlider = document.getElementById(rangeId);
+      var thisOutput = document.getElementById(outputId);
+      if(thisOutput){
+        thisOutput.innerHTML = settings[variableName];
+      }
+      thisSlider.value = settings[variableName];
+  
+      // Update the current slider value (each time you drag the slider handle)
+      thisSlider.oninput = function() {
+        settings[variableName] = this.value;
+        if(thisOutput){
+          thisOutput.innerHTML = this.value;
+        }
+      } 
+  
+    }
+  
+    initializeSlider("dotsRange",undefined,settings,"numberOfDots");
+    initializeSlider("speedRange",undefined,settings,"spinSpeed");
+    initializeSlider("colorSpeed",undefined,settings,"colorSpeed");
+    initializeSlider("rainbowRange",undefined,settings,"rainbowWavelength");
+    initializeSlider('radiusRange',undefined,settings,'radius');
+
+  
+  
+    var width = canvas.property("width"),
+        height = canvas.property("height"),
+        radius = 2.5,
+        transform = d3.zoomIdentity,
+        colorTracker =0;
+  
+  
+    var points = d3.range(settings.numberOfDots*settings.numberOfDots).map(phyllotaxis(10));
+  
+    var zoom = d3.zoom().scaleExtent([4/5, 20]).on("zoom", zoomed);
+    canvas
+        .call(d3.drag().subject(dragsubject).on("drag", dragged))
+        .call(zoom)
+        .call(render);
+  
+  
+    zoom.scaleBy(canvas, canvasSize/Math.sqrt(settings.numberOfDots*settings.numberOfDots*200));
+  
+    function zoomed() {
+      transform = d3.event.transform;
+      render();
+    }
+    function dragsubject() {
+      
+    }
+    function dragged() {
+      d3.event.subject[0] = transform.invertX(d3.event.x);
+      d3.event.subject[1] = transform.invertY(d3.event.y);
+      render();
+    }
+    var colorStart = 0;
+    function render() {
+      colorTracker = colorStart;
+      colorStart-=settings.colorSpeed; 
+      context.save();
+      context.clearRect(0, 0, width, height);
+      context.translate(transform.x, transform.y);
+      context.scale(transform.k, transform.k);
+      if(logoLoaded){
+        let logoImageDisplayWidth = 20;
+        let logoImageDisplayHeight = logoImageDisplayWidth * logoImage.height / logoImage.width;
+        context.drawImage(logoImage, width/2 - logoImageDisplayWidth/2, height/2 - logoImageDisplayHeight/2, logoImageDisplayWidth, logoImageDisplayHeight);
+        
+      }
+      points.forEach(drawPoint);
+      // context.fill();
+      context.restore();
+    }
+  
+    function changeColor(){
+      colorTracker += settings.rainbowWavelength/200;
+      return d3.hsv(colorTracker,1,1) 
+    }
+    function drawPoint(point) {
+      context.beginPath();
+      if(falafelLoaded && !settings.colorsOn){
+        let falafelImageDisplayWidth = 10;
+        let falafelImageDisplayHeight = falafelImageDisplayWidth * falafelImage.height / falafelImage.width;
+        context.drawImage(falafelImage,  point[0] - falafelImageDisplayWidth/2, point[1] - falafelImageDisplayHeight/2, falafelImageDisplayWidth, falafelImageDisplayHeight);
+        
+      }else{
+        context.moveTo(point[0] + radius, point[1]);
+        context.fillStyle = changeColor();
+        context.arc(point[0], point[1], radius, 0, 2 * Math.PI);
+        context.fill();
+      }
+    }
+    function phyllotaxis(radius, factor) {
+      var theta = Math.PI * (3 - Math.sqrt(5))+factor;
+      return function(i) {
+        var r = radius * Math.sqrt(i), a = theta * i;
+        return [
+          width / 2 + r * Math.cos(a),
+          height / 2 + r * Math.sin(a)
+        ];
+      };
+    }
+    var rotateFactor = 0;
+    var rr = function(){
+      points = d3.range(3, settings.numberOfDots*settings.numberOfDots).map(phyllotaxis(settings.radius,rotateFactor));
+      render();
+      rotateFactor += Math.sign(settings.spinSpeed)*settings.spinSpeed*settings.spinSpeed/1000000;
+      requestAnimationFrame(rr);
+    }
+    requestAnimationFrame(rr);
+    </script>
+  </body>
+</html>
+    

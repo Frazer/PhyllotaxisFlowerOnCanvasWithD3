@@ -140,21 +140,7 @@ function zoomed() {
   render();
 }
 function dragsubject() {
-  var i,
-      x = transform.invertX(d3.event.x),
-      y = transform.invertY(d3.event.y),
-      dx,
-      dy;
-  for (i = points.length - 1; i >= 0; --i) {
-    point = points[i];
-    dx = x - point[0];
-    dy = y - point[1];
-    if (dx * dx + dy * dy < radius * radius) {
-      point.x = transform.applyX(point[0]);
-      point.y = transform.applyY(point[1]);
-      return point;
-    }
-  }
+  
 }
 function dragged() {
   d3.event.subject[0] = transform.invertX(d3.event.x);
