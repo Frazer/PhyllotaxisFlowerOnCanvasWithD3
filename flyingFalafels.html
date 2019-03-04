@@ -34,7 +34,7 @@
         <input type="range" min="6" max="75" value="20" class="slider" id="dotsRange"><br/>
         Spread<br/>
         <input type="range" min="7" max="20" value="7" class="slider" id="radiusRange"><br/>
-        You can zoome and pan<br/>with your mouse<br/><br/>
+        You can zoom and pan<br/>with your mouse<br/><br/>
         <hr/>
         <span onClick="toggleColors()">Colors <input type="checkbox" name="" id="c">   <br/></span>
         <span id="colorControls">
@@ -61,15 +61,15 @@ let falafelImageReceived = ()=>{falafelLoaded = true};
 let falafelImage = new Image;
 
 function startDownload() {
-  let imageURL = "https://static.wixstatic.com/media/f37d82_6b811671500245a3910c892aaeeb3934~mv2_d_2660_1860_s_2.png/v1/fill/w_148,h_104,al_c,q_80,usm_0.66_1.00_0.01/f37d82_6b811671500245a3910c892aaeeb3934~mv2_d_2660_1860_s_2.webp";
+  let imageURL = "ff.png";
  
-  logoImage.crossOrigin = "Anonymous";
+  //logoImage.crossOrigin = "Anonymous";
   logoImage.addEventListener("load", logoImageReceived, false);
   logoImage.src = imageURL;
 
   let falafelImageURL = "falafel.png";
  
-  falafelImage.crossOrigin = "Anonymous";
+  //falafelImage.crossOrigin = "Anonymous";
   falafelImage.addEventListener("load", falafelImageReceived, false);
   falafelImage.src = falafelImageURL;
 }
